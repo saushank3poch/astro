@@ -10,9 +10,19 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) UNIQUE NOT NULL,
+
+    -- Basic Info (all optional to support wallet-first signup)
+    email VARCHAR(255) UNIQUE, -- Optional, can be added later
     username VARCHAR(100) UNIQUE,
-    password_hash VARCHAR(255), -- NULL for OAuth users
+    password_hash VARCHAR(255), -- NULL for OAuth/wallet users
+
+    -- Authentication
+    primary_auth_method VARCHAR(50) NOT NULL, -- wallet, email, google, apple, twitter
+    email_verified BOOLEAN DEFAULT false,
+
+    -- Social Connections (optional)
+    twitter_handle VARCHAR(100), -- X (Twitter) username
+    twitter_user_id VARCHAR(100), -- X user ID
 
     -- Birth Information
     birth_date DATE,
@@ -37,20 +47,94 @@ CREATE TABLE users (
     -- Settings
     language VARCHAR(10) DEFAULT 'en', -- en, zh
     astrology_system VARCHAR(20) DEFAULT 'both', -- chinese, western, both
-    notifications_enabled BOOLEAN DEFAULT true
+    notifications_enabled BOOLEAN DEFAULT true,
+
+    -- Constraints: Must have at least one auth method
+    CONSTRAINT check_has_auth_method CHECK (
+        email IS NOT NULL OR
+        EXISTS (SELECT 1 FROM wallet_connections WHERE user_id = users.id LIMIT 1) OR
+        EXISTS (SELECT 1 FROM oauth_connections WHERE user_id = users.id LIMIT 1)
+    )
 );
 
 CREATE TABLE oauth_connections (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    provider VARCHAR(50) NOT NULL, -- google, apple, facebook
+    provider VARCHAR(50) NOT NULL, -- google, apple, facebook, twitter
     provider_user_id VARCHAR(255) NOT NULL,
+    provider_username VARCHAR(255), -- For twitter handle, etc.
     access_token TEXT,
     refresh_token TEXT,
     expires_at TIMESTAMP,
+    profile_data JSONB, -- Store additional profile info from provider
     created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(provider, provider_user_id)
 );
+
+CREATE TABLE wallet_connections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+
+    -- Wallet Details
+    wallet_address VARCHAR(255) NOT NULL,
+    blockchain VARCHAR(50) NOT NULL, -- solana, ethereum, base, polygon
+    wallet_type VARCHAR(50), -- phantom, metamask, walletconnect, coinbase_wallet
+
+    -- Verification
+    is_primary BOOLEAN DEFAULT false, -- Primary wallet for this user
+    verified_at TIMESTAMP NOT NULL, -- When ownership was verified via signature
+    last_used_at TIMESTAMP,
+
+    -- ENS / SNS (name services)
+    domain_name VARCHAR(255), -- example.eth, example.sol
+
+    -- Metadata
+    label VARCHAR(100), -- User-defined label "My Main Wallet"
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+
+    UNIQUE(wallet_address, blockchain)
+);
+
+CREATE INDEX idx_wallet_connections_user ON wallet_connections(user_id);
+CREATE INDEX idx_wallet_connections_address ON wallet_connections(wallet_address);
+CREATE INDEX idx_wallet_connections_blockchain ON wallet_connections(blockchain, wallet_address);
+CREATE INDEX idx_oauth_connections_user ON oauth_connections(user_id);
+CREATE INDEX idx_oauth_connections_provider ON oauth_connections(provider, provider_user_id);
+
+-- Nonces for wallet signature verification
+CREATE TABLE wallet_nonces (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    wallet_address VARCHAR(255) NOT NULL,
+    blockchain VARCHAR(50) NOT NULL,
+    nonce VARCHAR(64) NOT NULL, -- Random string to sign
+    message TEXT NOT NULL, -- Full message to sign
+    used BOOLEAN DEFAULT false,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(wallet_address, blockchain, nonce)
+);
+
+CREATE INDEX idx_wallet_nonces_address ON wallet_nonces(wallet_address, blockchain);
+CREATE INDEX idx_wallet_nonces_expires ON wallet_nonces(expires_at) WHERE NOT used;
+
+-- Account linking requests (for linking email/twitter to wallet account)
+CREATE TABLE account_linking_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    link_type VARCHAR(50) NOT NULL, -- email, twitter, wallet
+    link_identifier VARCHAR(255) NOT NULL, -- email address, twitter handle, wallet address
+    verification_code VARCHAR(10), -- For email/twitter verification
+    verification_token VARCHAR(255), -- Secure token
+    status VARCHAR(50) DEFAULT 'pending', -- pending, verified, expired, cancelled
+    expires_at TIMESTAMP NOT NULL,
+    verified_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_linking_requests_user ON account_linking_requests(user_id);
+CREATE INDEX idx_linking_requests_token ON account_linking_requests(verification_token);
 
 -- ============================================================================
 -- ASTROLOGICAL PROFILES

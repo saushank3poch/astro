@@ -149,6 +149,85 @@ OAuth login/register with Google.
 **Response (200):**
 Same as `/auth/login`
 
+### POST /auth/oauth/twitter
+
+OAuth login/register with Twitter/X.
+
+**Request:**
+```json
+{
+  "code": "twitter_auth_code",
+  "redirectUri": "https://app.astro.com/auth/callback"
+}
+```
+
+**Response (200):**
+Same as `/auth/login`
+
+### Wallet Authentication
+
+**For detailed wallet authentication flow, see [Web3 Authentication Guide](./WEB3_AUTH.md)**
+
+### POST /auth/wallet/nonce
+
+Request a nonce for wallet signature verification.
+
+**Request:**
+```json
+{
+  "walletAddress": "7gxF...abc",
+  "blockchain": "solana"
+}
+```
+
+**Response (200):**
+```json
+{
+  "nonce": "a1b2c3d4e5f6",
+  "message": "Sign this message to authenticate with Astro:\n\nNonce: a1b2c3d4e5f6\nTimestamp: 2025-12-10T10:00:00Z\n\nThis request will not trigger a blockchain transaction or cost any gas fees.",
+  "expiresAt": "2025-12-10T10:05:00Z"
+}
+```
+
+### POST /auth/wallet/verify
+
+Verify wallet signature and authenticate user.
+
+**Request:**
+```json
+{
+  "walletAddress": "7gxF...abc",
+  "blockchain": "solana",
+  "signature": "5k2j...xyz",
+  "nonce": "a1b2c3d4e5f6"
+}
+```
+
+**Response (200/201):**
+```json
+{
+  "user": {
+    "id": "user-uuid",
+    "username": "cryptouser",
+    "email": null,
+    "primaryAuthMethod": "wallet",
+    "wallets": [
+      {
+        "address": "7gxF...abc",
+        "blockchain": "solana",
+        "isPrimary": true
+      }
+    ]
+  },
+  "tokens": {
+    "accessToken": "jwt_token",
+    "refreshToken": "refresh_token",
+    "expiresIn": 3600
+  },
+  "isNewUser": false
+}
+```
+
 ### GET /auth/me
 
 Get current authenticated user.
@@ -289,6 +368,215 @@ Create or update user's birth chart.
 
 **Response (201):**
 Same as GET /users/:userId/birth-chart
+
+---
+
+## Account Linking
+
+**For detailed account linking flows, see [Web3 Authentication Guide](./WEB3_AUTH.md#account-linking)**
+
+### GET /account/linked
+
+Get all linked authentication methods for the current user.
+
+**Response (200):**
+```json
+{
+  "userId": "user-uuid",
+  "primaryAuthMethod": "wallet",
+  "linkedMethods": {
+    "email": {
+      "verified": true,
+      "value": "user@example.com",
+      "linkedAt": "2025-12-10T10:00:00Z"
+    },
+    "twitter": {
+      "verified": true,
+      "handle": "@astrouser",
+      "userId": "123456789",
+      "linkedAt": "2025-12-10T10:05:00Z"
+    },
+    "wallets": [
+      {
+        "id": "wallet-uuid-1",
+        "address": "7gxF...abc",
+        "blockchain": "solana",
+        "isPrimary": true,
+        "label": "Main Wallet"
+      }
+    ]
+  }
+}
+```
+
+### POST /account/link/email
+
+Request email linking to current account.
+
+**Request:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response (200):**
+```json
+{
+  "linkingRequestId": "request-uuid",
+  "email": "user@example.com",
+  "status": "pending",
+  "message": "Verification code sent to user@example.com",
+  "expiresAt": "2025-12-10T10:15:00Z"
+}
+```
+
+### POST /account/link/email/verify
+
+Verify email linking code.
+
+**Request:**
+```json
+{
+  "linkingRequestId": "request-uuid",
+  "verificationCode": "123456"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "user": {
+    "id": "user-uuid",
+    "email": "user@example.com",
+    "emailVerified": true
+  }
+}
+```
+
+### GET /account/link/twitter
+
+Initiate Twitter OAuth linking flow.
+
+**Response (302):**
+Redirects to Twitter OAuth authorization
+
+### POST /account/link/wallet/nonce
+
+Request nonce for wallet linking.
+
+**Request:**
+```json
+{
+  "walletAddress": "0xABC...123",
+  "blockchain": "ethereum"
+}
+```
+
+**Response (200):**
+```json
+{
+  "nonce": "x9y8z7",
+  "message": "Link this wallet to your Astro account:\n\nNonce: x9y8z7\n...",
+  "expiresAt": "2025-12-10T10:05:00Z"
+}
+```
+
+### POST /account/link/wallet/verify
+
+Verify wallet signature and link to account.
+
+**Request:**
+```json
+{
+  "walletAddress": "0xABC...123",
+  "blockchain": "ethereum",
+  "signature": "0x5k2j...xyz",
+  "nonce": "x9y8z7",
+  "isPrimary": false,
+  "label": "MetaMask Wallet"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "wallet": {
+    "id": "wallet-uuid",
+    "address": "0xABC...123",
+    "blockchain": "ethereum",
+    "isPrimary": false,
+    "label": "MetaMask Wallet"
+  }
+}
+```
+
+### DELETE /account/unlink/:type/:id
+
+Unlink an authentication method.
+
+**Parameters:**
+- `type`: email, twitter, wallet, google, apple
+- `id`: For wallets, the wallet ID; for others, optional
+
+**Example:** `DELETE /account/unlink/wallet/wallet-uuid-2`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Wallet 0xABC...123 has been unlinked"
+}
+```
+
+**Error (400):**
+```json
+{
+  "error": {
+    "code": "LAST_AUTH_METHOD",
+    "message": "Cannot unlink the last authentication method"
+  }
+}
+```
+
+### PATCH /account/wallet/:walletId/primary
+
+Set a wallet as the primary wallet.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "primaryWallet": {
+    "id": "wallet-uuid",
+    "address": "0xABC...123",
+    "blockchain": "ethereum"
+  }
+}
+```
+
+### PATCH /account/wallet/:walletId
+
+Update wallet details.
+
+**Request:**
+```json
+{
+  "label": "Trading Wallet"
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": "wallet-uuid",
+  "address": "7gxF...abc",
+  "label": "Trading Wallet",
+  "updatedAt": "2025-12-10T10:10:00Z"
+}
+```
 
 ---
 
