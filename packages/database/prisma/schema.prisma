@@ -1,0 +1,480 @@
+// Astro Prediction Platform - Prisma Schema
+// Generated from schema.sql
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USERS & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Basic Info
+  email         String?  @unique @db.VarChar(255)
+  username      String?  @unique @db.VarChar(100)
+  passwordHash  String?  @map("password_hash") @db.VarChar(255)
+
+  // Authentication
+  primaryAuthMethod String  @map("primary_auth_method") @db.VarChar(50)
+  emailVerified     Boolean @default(false) @map("email_verified")
+
+  // Social Connections
+  twitterHandle String? @map("twitter_handle") @db.VarChar(100)
+  twitterUserId String? @map("twitter_user_id") @db.VarChar(100)
+
+  // Birth Information
+  birthDate     DateTime? @map("birth_date") @db.Date
+  birthTime     DateTime? @map("birth_time") @db.Time()
+  birthLocation Json?     @map("birth_location")
+  birthTimezone String?   @map("birth_timezone") @db.VarChar(50)
+
+  // Subscription
+  subscriptionTier      String    @default("free") @map("subscription_tier") @db.VarChar(50)
+  subscriptionStatus    String    @default("active") @map("subscription_status") @db.VarChar(50)
+  subscriptionExpiresAt DateTime? @map("subscription_expires_at")
+  subscriptionProvider  String?   @map("subscription_provider") @db.VarChar(50)
+
+  // Platform
+  platform String @default("web") @db.VarChar(20)
+
+  // Tracking
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  // Settings
+  language              String  @default("en") @db.VarChar(10)
+  astrologySystem       String  @default("both") @map("astrology_system") @db.VarChar(20)
+  notificationsEnabled  Boolean @default(true) @map("notifications_enabled")
+
+  // Relations
+  oauthConnections     OAuthConnection[]
+  walletConnections    WalletConnection[]
+  astrologicalProfile  UserAstrologicalProfile?
+  predictions          Prediction[]
+  assetCompatibility   UserAssetCompatibility[]
+  linkingRequests      AccountLinkingRequest[]
+  transactions         Transaction[]
+  credits              UserCredits?
+  usageLogs            UsageLog[]
+  researchedAssets     Asset[]
+
+  @@map("users")
+}
+
+model OAuthConnection {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId         String @map("user_id") @db.Uuid
+  provider       String @db.VarChar(50)
+  providerUserId String @map("provider_user_id") @db.VarChar(255)
+  providerUsername String? @map("provider_username") @db.VarChar(255)
+  accessToken    String? @map("access_token") @db.Text
+  refreshToken   String? @map("refresh_token") @db.Text
+  expiresAt      DateTime? @map("expires_at")
+  profileData    Json?   @map("profile_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([provider, providerUserId])
+  @@map("oauth_connections")
+}
+
+model WalletConnection {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+
+  // Wallet Details
+  walletAddress String @map("wallet_address") @db.VarChar(255)
+  blockchain    String @db.VarChar(50)
+  walletType    String? @map("wallet_type") @db.VarChar(50)
+
+  // Verification
+  isPrimary    Boolean   @default(false) @map("is_primary")
+  verifiedAt   DateTime  @map("verified_at")
+  lastUsedAt   DateTime? @map("last_used_at")
+
+  // ENS / SNS
+  domainName String? @map("domain_name") @db.VarChar(255)
+
+  // Metadata
+  label     String?  @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([walletAddress, blockchain])
+  @@index([userId])
+  @@index([walletAddress])
+  @@index([blockchain, walletAddress])
+  @@map("wallet_connections")
+}
+
+model WalletNonce {
+  id String @id @default(uuid()) @db.Uuid
+
+  walletAddress String   @map("wallet_address") @db.VarChar(255)
+  blockchain    String   @db.VarChar(50)
+  nonce         String   @db.VarChar(64)
+  message       String   @db.Text
+  used          Boolean  @default(false)
+  expiresAt     DateTime @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([walletAddress, blockchain, nonce])
+  @@index([walletAddress, blockchain])
+  @@index([expiresAt])
+  @@map("wallet_nonces")
+}
+
+model AccountLinkingRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId           String    @map("user_id") @db.Uuid
+  linkType         String    @map("link_type") @db.VarChar(50)
+  linkIdentifier   String    @map("link_identifier") @db.VarChar(255)
+  verificationCode String?   @map("verification_code") @db.VarChar(10)
+  verificationToken String?  @map("verification_token") @db.VarChar(255)
+  status           String    @default("pending") @db.VarChar(50)
+  expiresAt        DateTime  @map("expires_at")
+  verifiedAt       DateTime? @map("verified_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([verificationToken])
+  @@map("account_linking_requests")
+}
+
+// ============================================================================
+// ASTROLOGICAL PROFILES
+// ============================================================================
+
+model UserAstrologicalProfile {
+  userId String @id @map("user_id") @db.Uuid
+
+  // Chinese Astrology
+  chineseZodiac       String?  @map("chinese_zodiac") @db.VarChar(20)
+  chineseElement      String?  @map("chinese_element") @db.VarChar(20)
+  baziChart           Json?    @map("bazi_chart")
+  favorableElements   Json?    @map("favorable_elements")
+  unfavorableElements Json?    @map("unfavorable_elements")
+  luckyNumbers        Int[]    @map("lucky_numbers")
+  luckyColors         String[] @map("lucky_colors") @db.VarChar(50)
+
+  // Western Astrology
+  sunSign          String?  @map("sun_sign") @db.VarChar(20)
+  moonSign         String?  @map("moon_sign") @db.VarChar(20)
+  risingSign       String?  @map("rising_sign") @db.VarChar(20)
+  birthChart       Json?    @map("birth_chart")
+  dominantElements Json?    @map("dominant_elements")
+  dominantModality String?  @map("dominant_modality") @db.VarChar(20)
+  chartPatterns    String[] @map("chart_patterns") @db.VarChar(50)
+
+  calculatedAt DateTime @default(now()) @map("calculated_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_astrological_profiles")
+}
+
+// ============================================================================
+// ASSETS & TICKERS
+// ============================================================================
+
+model Asset {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Basic Info
+  symbol    String @unique @db.VarChar(50)
+  name      String @db.VarChar(255)
+  assetType String @map("asset_type") @db.VarChar(50)
+  category  String? @db.VarChar(100)
+  exchange  String? @db.VarChar(100)
+
+  // Birth Information
+  birthDate               DateTime? @map("birth_date") @db.Date
+  birthTime               DateTime? @map("birth_time") @db.Time()
+  birthLocation           Json?     @map("birth_location")
+  birthDateSource         String?   @map("birth_date_source") @db.VarChar(255)
+  birthDateConfidence     String?   @map("birth_date_confidence") @db.VarChar(20)
+  alternativeBirthDates   Json?     @map("alternative_birth_dates")
+
+  // Chinese Astrology
+  primaryElement     String? @map("primary_element") @db.VarChar(20)
+  secondaryElement   String? @map("secondary_element") @db.VarChar(20)
+  chineseZodiac      String? @map("chinese_zodiac") @db.VarChar(20)
+  baziChart          Json?   @map("bazi_chart")
+  elementReasoning   String? @map("element_reasoning") @db.Text
+
+  // Western Astrology
+  sunSign          String?   @map("sun_sign") @db.VarChar(20)
+  dominantPlanet   String?   @map("dominant_planet") @db.VarChar(20)
+  planetaryRulers  String[]  @map("planetary_rulers") @db.VarChar(20)
+  birthChart       Json?     @map("birth_chart")
+
+  // Market Data
+  marketCap     Decimal? @map("market_cap")
+  currentPrice  Decimal? @map("current_price")
+  priceCurrency String   @default("USD") @map("price_currency") @db.VarChar(10)
+
+  // Status
+  isActive     Boolean @default(true) @map("is_active")
+  isResearched Boolean @default(false) @map("is_researched")
+  needsReview  Boolean @default(false) @map("needs_review")
+
+  // Metadata
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  researchedAt DateTime? @map("researched_at")
+  researchedBy String?   @map("researched_by") @db.Uuid
+
+  researcher       User?                    @relation(fields: [researchedBy], references: [id])
+  predictions      Prediction[]
+  compatibility    UserAssetCompatibility[]
+
+  @@index([symbol])
+  @@index([assetType])
+  @@index([category])
+  @@index([primaryElement])
+  @@map("assets")
+}
+
+// ============================================================================
+// PREDICTIONS
+// ============================================================================
+
+model Prediction {
+  id     String  @id @default(uuid()) @db.Uuid
+  userId String? @map("user_id") @db.Uuid
+
+  // Prediction Type
+  predictionType String  @map("prediction_type") @db.VarChar(50)
+  method         String? @db.VarChar(50)
+
+  // Query Details
+  question         String?   @db.Text
+  targetAssetId    String?   @map("target_asset_id") @db.Uuid
+  targetAssetClass String?   @map("target_asset_class") @db.VarChar(50)
+  timeframe        String?   @db.VarChar(50)
+  specificDate     DateTime? @map("specific_date") @db.Date
+
+  // User Context
+  userBirthChartSnapshot Json? @map("user_birth_chart_snapshot")
+
+  // Prediction Results
+  predictionResult     Json?     @map("prediction_result")
+  confidenceScore      Decimal?  @map("confidence_score") @db.Decimal(3, 2)
+  favorabilityScore    Int?      @map("favorability_score")
+  favorablePeriodStart DateTime? @map("favorable_period_start") @db.Date
+  favorablePeriodEnd   DateTime? @map("favorable_period_end") @db.Date
+
+  // AI Agent Details
+  primaryAgent      String? @map("primary_agent") @db.VarChar(100)
+  supportingAgents  Json?   @map("supporting_agents")
+  reasoning         String? @db.Text
+  technicalAnalysis Json?   @map("technical_analysis")
+  recommendations   Json?
+
+  // Divination Specific
+  divinationMethod String? @map("divination_method") @db.VarChar(50)
+  divinationResult Json?   @map("divination_result")
+
+  // Validation & Tracking
+  actualOutcome       String?   @map("actual_outcome") @db.VarChar(50)
+  outcomeRecordedAt   DateTime? @map("outcome_recorded_at")
+  accuracyScore       Decimal?  @map("accuracy_score") @db.Decimal(3, 2)
+  userFeedbackRating  Int?      @map("user_feedback_rating")
+  userFeedbackText    String?   @map("user_feedback_text") @db.Text
+
+  // Status
+  status       String  @default("pending") @db.VarChar(50)
+  errorMessage String? @map("error_message") @db.Text
+
+  // Timing
+  createdAt           DateTime  @default(now()) @map("created_at")
+  processingStartedAt DateTime? @map("processing_started_at")
+  completedAt         DateTime? @map("completed_at")
+
+  // Credits
+  creditsUsed Int @default(1) @map("credits_used")
+
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  asset Asset? @relation(fields: [targetAssetId], references: [id])
+
+  usageLogs UsageLog[]
+
+  @@index([userId])
+  @@index([predictionType])
+  @@index([targetAssetId])
+  @@index([createdAt(sort: Desc)])
+  @@index([status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, predictionType])
+  @@map("predictions")
+}
+
+// ============================================================================
+// USER-ASSET COMPATIBILITY
+// ============================================================================
+
+model UserAssetCompatibility {
+  id      String @id @default(uuid()) @db.Uuid
+  userId  String @map("user_id") @db.Uuid
+  assetId String @map("asset_id") @db.Uuid
+
+  // Compatibility Scores
+  overallCompatibilityScore    Int? @map("overall_compatibility_score")
+  elementCompatibilityScore    Int? @map("element_compatibility_score")
+  planetaryCompatibilityScore  Int? @map("planetary_compatibility_score")
+  timingCompatibilityScore     Int? @map("timing_compatibility_score")
+
+  // Detailed Analysis
+  elementHarmony       Json? @map("element_harmony")
+  planetaryHarmony     Json? @map("planetary_harmony")
+  favorableAspects     Json? @map("favorable_aspects")
+  challengingAspects   Json? @map("challenging_aspects")
+
+  // Recommendations
+  recommendationLevel String? @map("recommendation_level") @db.VarChar(50)
+  reasoning           String? @db.Text
+  bestEntryPeriods    Json?   @map("best_entry_periods")
+  warningPeriods      Json?   @map("warning_periods")
+
+  // Personalized Insights
+  whyGoodForUser        String? @map("why_good_for_user") @db.Text
+  whyChallengingForUser String? @map("why_challenging_for_user") @db.Text
+  tips                  String? @db.Text
+
+  // Metadata
+  calculatedAt DateTime  @default(now()) @map("calculated_at")
+  expiresAt    DateTime? @map("expires_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, assetId])
+  @@index([userId])
+  @@index([overallCompatibilityScore(sort: Desc)])
+  @@index([userId, overallCompatibilityScore(sort: Desc)])
+  @@map("user_asset_compatibility")
+}
+
+// ============================================================================
+// PAYMENTS & SUBSCRIPTIONS
+// ============================================================================
+
+model Transaction {
+  id     String  @id @default(uuid()) @db.Uuid
+  userId String? @map("user_id") @db.Uuid
+
+  // Transaction Details
+  amount        Decimal @db.Decimal
+  currency      String  @db.VarChar(20)
+  paymentMethod String  @map("payment_method") @db.VarChar(50)
+
+  // Crypto Specific
+  transactionHash   String? @map("transaction_hash") @db.VarChar(255)
+  fromWallet        String? @map("from_wallet") @db.VarChar(255)
+  toWallet          String? @map("to_wallet") @db.VarChar(255)
+  blockchain        String? @db.VarChar(50)
+  confirmationCount Int?    @map("confirmation_count")
+
+  // IAP Specific
+  receiptData             String? @map("receipt_data") @db.Text
+  appStoreTransactionId   String? @map("app_store_transaction_id") @db.VarChar(255)
+  originalTransactionId   String? @map("original_transaction_id") @db.VarChar(255)
+  productId               String? @map("product_id") @db.VarChar(255)
+
+  // Fulfillment
+  creditsGranted          Int?    @map("credits_granted")
+  subscriptionDaysGranted Int?    @map("subscription_days_granted")
+  subscriptionTierGranted String? @map("subscription_tier_granted") @db.VarChar(50)
+
+  // Status
+  status        String  @default("pending") @db.VarChar(50)
+  failureReason String? @map("failure_reason") @db.Text
+
+  // Metadata
+  createdAt   DateTime  @default(now()) @map("created_at")
+  confirmedAt DateTime? @map("confirmed_at")
+  completedAt DateTime? @map("completed_at")
+  refundedAt  DateTime? @map("refunded_at")
+
+  // Revenue tracking
+  usdValue    Decimal? @map("usd_value") @db.Decimal
+  platformFee Decimal? @map("platform_fee") @db.Decimal
+  netRevenue  Decimal? @map("net_revenue") @db.Decimal
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([transactionHash])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("transactions")
+}
+
+model UserCredits {
+  userId String @id @map("user_id") @db.Uuid
+
+  creditsBalance           Int       @default(0) @map("credits_balance")
+  creditsUsedLifetime      Int       @default(0) @map("credits_used_lifetime")
+  creditsPurchasedLifetime Int       @default(0) @map("credits_purchased_lifetime")
+  lastCreditPurchaseAt     DateTime? @map("last_credit_purchase_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_credits")
+}
+
+// ============================================================================
+// USAGE TRACKING
+// ============================================================================
+
+model UsageLog {
+  id           String  @id @default(uuid()) @db.Uuid
+  userId       String? @map("user_id") @db.Uuid
+  predictionId String? @map("prediction_id") @db.Uuid
+
+  // Action tracking
+  action String @db.VarChar(50)
+
+  // Credits
+  creditsUsed      Int  @default(0) @map("credits_used")
+  creditsRemaining Int? @map("credits_remaining")
+
+  // Context
+  platform   String? @db.VarChar(20)
+  deviceInfo Json?   @map("device_info")
+  ipAddress  String? @map("ip_address") @db.Inet
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  prediction Prediction? @relation(fields: [predictionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("usage_logs")
+}

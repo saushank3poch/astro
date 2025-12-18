@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Prisma
+.env
+prisma/.env
+migrations/
+
+# Build
+dist/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
