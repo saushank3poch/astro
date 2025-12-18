@@ -5,6 +5,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
+import birthChartRoutes from './routes/birth-chart.routes';
 import { requestLogger } from './middleware/request-logger.middleware';
 import { errorHandler, notFound } from './middleware/error.middleware';
 import logger from './utils/logger';
@@ -73,6 +74,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/v1/auth', authRoutes);
+app.use('/v1', birthChartRoutes);
 
 // 404 handler
 app.use(notFound);

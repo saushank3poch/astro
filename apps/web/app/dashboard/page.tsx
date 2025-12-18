@@ -1,21 +1,62 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/auth';
+import { apiClient } from '@/lib/api';
 import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
+import { ChineseZodiac, ZodiacSign, ElementIndicator } from '@/components/astro';
+import type { BirthChart, Asset } from '@/types';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
+  const [birthChart, setBirthChart] = useState<BirthChart | null>(null);
+  const [topAssets, setTopAssets] = useState<any[]>([]);
+  const [isLoadingChart, setIsLoadingChart] = useState(false);
+  const [isLoadingAssets, setIsLoadingAssets] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/');
+      return;
     }
-  }, [isAuthenticated, router]);
+
+    if (user && user.birthDate && user.birthTime && user.birthLocation) {
+      fetchBirthChart();
+      fetchTopCompatibleAssets();
+    }
+  }, [isAuthenticated, user, router]);
+
+  const fetchBirthChart = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoadingChart(true);
+      const chart = await apiClient.getUserBirthChart(user.id);
+      setBirthChart(chart);
+    } catch (error) {
+      console.error('Error fetching birth chart:', error);
+    } finally {
+      setIsLoadingChart(false);
+    }
+  };
+
+  const fetchTopCompatibleAssets = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoadingAssets(true);
+      const response = await apiClient.getTopCompatibleAssets(user.id, { limit: 3 });
+      setTopAssets(response.topAssets || []);
+    } catch (error) {
+      console.error('Error fetching top assets:', error);
+    } finally {
+      setIsLoadingAssets(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -92,11 +133,184 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
 
+        {/* Astrological Profile Card */}
+        {user.birthDate && user.birthTime && user.birthLocation ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <Card variant="glass" padding="lg">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Your Astrological Profile</CardTitle>
+                    <CardDescription>Your cosmic blueprint</CardDescription>
+                  </div>
+                  <Link href="/profile">
+                    <Button variant="outline" size="sm">
+                      View Full Chart
+                    </Button>
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingChart ? (
+                  <div className="text-center py-8 text-cosmic-silver/70">
+                    Loading your cosmic profile...
+                  </div>
+                ) : birthChart ? (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Chinese Astrology Preview */}
+                    {birthChart.chinese && (
+                      <div className="border-r border-cosmic-violet/20 pr-6">
+                        <h4 className="text-lg font-semibold text-cosmic-gold mb-4">Chinese Astrology</h4>
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="text-5xl">{getZodiacEmoji(birthChart.chinese.zodiacAnimal)}</div>
+                          <div>
+                            <div className="font-bold text-lg capitalize">{birthChart.chinese.zodiacAnimal}</div>
+                            <ElementIndicator element={birthChart.chinese.element} size="sm" />
+                          </div>
+                        </div>
+                        <div className="text-sm text-cosmic-silver/70">
+                          {birthChart.chinese.personality?.slice(0, 100)}...
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Western Astrology Preview */}
+                    {birthChart.western && (
+                      <div className="pl-6">
+                        <h4 className="text-lg font-semibold text-cosmic-violet mb-4">Western Astrology</h4>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-cosmic-silver/70">Sun:</span>
+                            <ZodiacSign sign={birthChart.western.sunSign} size="sm" />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-cosmic-silver/70">Moon:</span>
+                            <ZodiacSign sign={birthChart.western.moonSign} size="sm" />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-cosmic-silver/70">Rising:</span>
+                            <ZodiacSign sign={birthChart.western.risingSign} size="sm" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-cosmic-silver/70">
+                    <p>Unable to load birth chart</p>
+                    <Link href="/profile">
+                      <Button variant="outline" size="sm" className="mt-4">
+                        Try Again
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <Card variant="glass" padding="lg">
+              <CardHeader>
+                <CardTitle>Complete Your Profile</CardTitle>
+                <CardDescription>Unlock your full astrological potential</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">🌟</div>
+                  <p className="text-cosmic-silver/80 mb-6">
+                    Add your birth date, time, and location to generate your complete birth chart
+                    and discover compatible assets.
+                  </p>
+                  <Link href="/settings">
+                    <Button variant="primary">Complete Birth Information</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Top Compatible Assets */}
+        {user.birthDate && user.birthTime && user.birthLocation && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mb-8"
+          >
+            <Card variant="glass" padding="lg">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Top Compatible Assets</CardTitle>
+                    <CardDescription>Assets aligned with your cosmic blueprint</CardDescription>
+                  </div>
+                  <Link href="/assets">
+                    <Button variant="outline" size="sm">
+                      View All Assets
+                    </Button>
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAssets ? (
+                  <div className="text-center py-8 text-cosmic-silver/70">
+                    Analyzing cosmic alignments...
+                  </div>
+                ) : topAssets.length > 0 ? (
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {topAssets.map((item: any) => (
+                      <Link key={item.asset.symbol} href={`/compatibility/${item.asset.symbol}`}>
+                        <div className="p-4 rounded-lg bg-cosmic-deep/50 border border-cosmic-violet/20 hover:border-cosmic-violet/50 transition-all cursor-pointer">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <div className="font-bold text-cosmic-gold">{item.asset.symbol}</div>
+                              <div className="text-xs text-cosmic-silver/60">{item.asset.name}</div>
+                            </div>
+                            <div className={`text-lg font-bold ${
+                              item.compatibilityScore >= 8 ? 'text-green-400' :
+                              item.compatibilityScore >= 6 ? 'text-yellow-400' :
+                              'text-orange-400'
+                            }`}>
+                              {item.compatibilityScore.toFixed(1)}
+                            </div>
+                          </div>
+                          {item.asset.primaryElement && (
+                            <ElementIndicator element={item.asset.primaryElement} size="sm" />
+                          )}
+                          <div className="mt-3 text-xs text-cosmic-silver/70">
+                            Click to see full compatibility analysis
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-cosmic-silver/70">
+                    No compatibility data available yet
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.4 }}
         >
           <Card variant="glass" padding="lg">
             <CardHeader>
@@ -105,12 +319,16 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                <Button fullWidth variant="primary" disabled>
-                  🔮 New Prediction
-                </Button>
-                <Button fullWidth variant="secondary" disabled>
-                  ⭐ View Compatible Assets
-                </Button>
+                <Link href="/profile">
+                  <Button fullWidth variant="primary">
+                    🔮 View Birth Chart
+                  </Button>
+                </Link>
+                <Link href="/assets">
+                  <Button fullWidth variant="secondary">
+                    ⭐ Browse Assets
+                  </Button>
+                </Link>
                 <Button fullWidth variant="outline" disabled>
                   📊 Polymarket Events
                 </Button>
@@ -119,7 +337,7 @@ export default function DashboardPage() {
                 </Button>
               </div>
               <p className="text-xs text-cosmic-silver/60 text-center mt-4">
-                Prediction features coming soon!
+                More features coming soon!
               </p>
             </CardContent>
           </Card>
@@ -129,7 +347,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.5 }}
           className="mt-8"
         >
           <Card variant="glass" padding="lg">
@@ -176,4 +394,23 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+// Helper function for Chinese zodiac emoji
+function getZodiacEmoji(animal: string): string {
+  const emojis: Record<string, string> = {
+    rat: '🐭',
+    ox: '🐂',
+    tiger: '🐅',
+    rabbit: '🐰',
+    dragon: '🐲',
+    snake: '🐍',
+    horse: '🐴',
+    goat: '🐐',
+    monkey: '🐵',
+    rooster: '🐓',
+    dog: '🐕',
+    pig: '🐷',
+  };
+  return emojis[animal] || '⭐';
 }

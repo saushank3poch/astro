@@ -1,0 +1,29 @@
+{
+  "name": "@astro/astro-core",
+  "version": "0.1.0",
+  "description": "Astrological calculation library for Chinese and Western astrology",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest"
+  },
+  "keywords": [
+    "astrology",
+    "chinese-astrology",
+    "western-astrology",
+    "bazi",
+    "birth-chart",
+    "zodiac"
+  ],
+  "author": "Astro Platform",
+  "license": "MIT",
+  "dependencies": {
+    "astronomy-engine": "^2.1.19"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

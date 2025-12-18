@@ -351,3 +351,86 @@ export interface AstrologicalPrediction {
   recommendation?: string;
   agentUsed?: string;
 }
+
+// Birth Chart types
+export interface BirthChart {
+  userId: string;
+  chinese?: ChineseBirthChart;
+  western?: WesternBirthChart;
+  calculatedAt: string;
+}
+
+export interface ChineseBirthChart {
+  zodiacAnimal: ChineseZodiac;
+  zodiacYear: number;
+  element: ChineseElement;
+  yinYang: 'yin' | 'yang';
+  bazi: BaziPillars;
+  favorableElements: ChineseElement[];
+  unfavorableElements: ChineseElement[];
+  luckyNumbers: number[];
+  luckyColors: string[];
+  luckyDirections: string[];
+  personality: string;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+export interface BaziPillars {
+  year: BaziPillar;
+  month: BaziPillar;
+  day: BaziPillar;
+  hour: BaziPillar;
+}
+
+export interface BaziPillar {
+  heavenlyStem: string;
+  earthlyBranch: string;
+  element: ChineseElement;
+}
+
+export interface WesternBirthChart {
+  sunSign: ZodiacSign;
+  moonSign: ZodiacSign;
+  risingSign: ZodiacSign;
+  planets: PlanetaryPosition[];
+  houses: HousePosition[];
+  aspects: Aspect[];
+  dominantElements: ElementDistribution;
+  dominantModality: 'cardinal' | 'fixed' | 'mutable';
+  dominantPolarity: 'positive' | 'negative';
+  chartPattern?: string;
+}
+
+export interface PlanetaryPosition {
+  planet: Planet;
+  sign: ZodiacSign;
+  house: number;
+  degree: number;
+  isRetrograde: boolean;
+}
+
+export type Planet = 'sun' | 'moon' | 'mercury' | 'venus' | 'mars' | 'jupiter' | 'saturn' | 'uranus' | 'neptune' | 'pluto';
+
+export interface HousePosition {
+  house: number;
+  sign: ZodiacSign;
+  degree: number;
+}
+
+export interface Aspect {
+  planet1: Planet;
+  planet2: Planet;
+  type: AspectType;
+  angle: number;
+  orb: number;
+}
+
+export type AspectType = 'conjunction' | 'opposition' | 'trine' | 'square' | 'sextile' | 'quincunx';
+
+export interface ElementDistribution {
+  fire: number;
+  earth: number;
+  air: number;
+  water: number;
+}
