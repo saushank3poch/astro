@@ -44,6 +44,13 @@ export * from './western/houses';
 export * from './western/aspects';
 
 // ============================================================================
+// PREDICTION ENGINES
+// ============================================================================
+export * from './predictions/macro';
+export * from './predictions/timing';
+export * from './predictions/divination';
+
+// ============================================================================
 // CONVENIENCE FUNCTIONS
 // ============================================================================
 
