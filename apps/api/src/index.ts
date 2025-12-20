@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
 import birthChartRoutes from './routes/birth-chart.routes';
 import predictionsRoutes from './routes/predictions.routes';
+import compatibilityRoutes from './routes/compatibility.routes';
 import { requestLogger } from './middleware/request-logger.middleware';
 import { errorHandler, notFound } from './middleware/error.middleware';
 import logger from './utils/logger';
@@ -77,6 +78,7 @@ app.get('/health', (req, res) => {
 app.use('/v1/auth', authRoutes);
 app.use('/v1', birthChartRoutes);
 app.use('/v1/predictions', predictionsRoutes);
+app.use('/v1/compatibility', compatibilityRoutes);
 
 // 404 handler
 app.use(notFound);

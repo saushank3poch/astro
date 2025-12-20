@@ -271,6 +271,29 @@ class APIClient {
     return response.data;
   }
 
+  async getAllCompatibilities(
+    userId: string,
+    params?: { assetType?: string; minScore?: number; sortBy?: string }
+  ): Promise<{ userId: string; compatibilities: any[] }> {
+    const response = await this.client.get(`/compatibility/${userId}/all`, { params });
+    return response.data;
+  }
+
+  async getAssetCompatibility(
+    userId: string,
+    assetSymbol: string
+  ): Promise<CompatibilityResult> {
+    const response = await this.client.get<CompatibilityResult>(
+      `/compatibility/${userId}/asset/${assetSymbol}`
+    );
+    return response.data;
+  }
+
+  async refreshCompatibilities(userId: string): Promise<{ message: string; count: number }> {
+    const response = await this.client.post(`/compatibility/${userId}/refresh`);
+    return response.data;
+  }
+
   // Polymarket
   async getPolymarketEvents(params?: {
     category?: string;

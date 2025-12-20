@@ -11,10 +11,11 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuthStore();
+  const [highCompatibilityCount, setHighCompatibilityCount] = React.useState(0);
 
-  // Fetch user on mount to get latest credits
+  // Fetch user on mount to get latest credits and compatibility count
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && user) {
       apiClient.getCurrentUser()
         .then((updatedUser) => {
           useAuthStore.setState({ user: updatedUser });
@@ -22,8 +23,17 @@ export function Navbar() {
         .catch((err) => {
           console.error('Error fetching user:', err);
         });
+
+      // Fetch high compatibility count (score >= 8)
+      apiClient.getTopCompatibleAssets(user.id, { minScore: 8, limit: 100 })
+        .then((response) => {
+          setHighCompatibilityCount(response.topAssets?.length || 0);
+        })
+        .catch((err) => {
+          console.error('Error fetching compatibility count:', err);
+        });
     }
-  }, [isAuthenticated, pathname]);
+  }, [isAuthenticated, user, pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -37,6 +47,7 @@ export function Navbar() {
 
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
+    { href: '/compatibility', label: 'My Matches', badge: highCompatibilityCount },
     { href: '/predictions', label: 'Predictions' },
     { href: '/assets', label: 'Assets' },
     { href: '/profile', label: 'Profile' },
@@ -62,13 +73,18 @@ export function Navbar() {
               <Link key={link.href} href={link.href}>
                 <motion.div
                   whileHover={{ scale: 1.05 }}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`relative px-4 py-2 rounded-lg transition-all ${
                     pathname === link.href
                       ? 'bg-cosmic-violet/20 text-cosmic-gold'
                       : 'text-cosmic-silver/80 hover:text-cosmic-silver hover:bg-cosmic-violet/10'
                   }`}
                 >
                   {link.label}
+                  {link.badge !== undefined && link.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-cosmic-violet rounded-full border-2 border-cosmic-deep">
+                      {link.badge > 9 ? '9+' : link.badge}
+                    </span>
+                  )}
                 </motion.div>
               </Link>
             ))}
@@ -138,13 +154,18 @@ export function Navbar() {
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href}>
               <div
-                className={`px-3 py-2 text-sm rounded transition-all ${
+                className={`relative px-3 py-2 text-sm rounded transition-all ${
                   pathname === link.href
                     ? 'bg-cosmic-violet/20 text-cosmic-gold'
                     : 'text-cosmic-silver/80'
                 }`}
               >
                 {link.label}
+                {link.badge !== undefined && link.badge > 0 && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-cosmic-violet rounded-full">
+                    {link.badge > 9 ? '9+' : link.badge}
+                  </span>
+                )}
               </div>
             </Link>
           ))}

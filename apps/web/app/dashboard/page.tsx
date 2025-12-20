@@ -241,7 +241,7 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-        {/* Top Compatible Assets */}
+        {/* Best Assets For You */}
         {user.birthDate && user.birthTime && user.birthLocation && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -253,52 +253,115 @@ export default function DashboardPage() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle>Top Compatible Assets</CardTitle>
-                    <CardDescription>Assets aligned with your cosmic blueprint</CardDescription>
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="text-2xl">✨</span>
+                      Best Assets For You
+                    </CardTitle>
+                    <CardDescription>Your top 5 compatible assets based on cosmic alignment</CardDescription>
                   </div>
-                  <Link href="/assets">
+                  <Link href="/compatibility">
                     <Button variant="outline" size="sm">
-                      View All Assets
+                      See All
                     </Button>
                   </Link>
                 </div>
               </CardHeader>
               <CardContent>
                 {isLoadingAssets ? (
-                  <div className="text-center py-8 text-cosmic-silver/70">
-                    Analyzing cosmic alignments...
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                      className="text-5xl mb-4"
+                    >
+                      ✨
+                    </motion.div>
+                    <div className="text-cosmic-silver/70">Analyzing cosmic alignments...</div>
                   </div>
                 ) : topAssets.length > 0 ? (
-                  <div className="grid md:grid-cols-3 gap-4">
-                    {topAssets.map((item: any) => (
-                      <Link key={item.asset.symbol} href={`/compatibility/${item.asset.symbol}`}>
-                        <div className="p-4 rounded-lg bg-cosmic-deep/50 border border-cosmic-violet/20 hover:border-cosmic-violet/50 transition-all cursor-pointer">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <div className="font-bold text-cosmic-gold">{item.asset.symbol}</div>
-                              <div className="text-xs text-cosmic-silver/60">{item.asset.name}</div>
+                  <div className="space-y-3">
+                    {topAssets.slice(0, 5).map((item: any, index: number) => (
+                      <motion.div
+                        key={item.asset.symbol}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <Link href={`/compatibility/${item.asset.symbol}`}>
+                          <div className="group p-4 rounded-lg bg-cosmic-deep/30 border border-cosmic-violet/20 hover:border-cosmic-violet/50 hover:bg-cosmic-deep/50 transition-all cursor-pointer">
+                            <div className="flex items-center justify-between">
+                              {/* Asset Info */}
+                              <div className="flex items-center gap-4 flex-1">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-cosmic-violet/20 text-cosmic-gold font-bold">
+                                  #{index + 1}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-bold text-cosmic-gold">{item.asset.symbol}</span>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-cosmic-violet/20 text-cosmic-violet">
+                                      {item.asset.assetType}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-cosmic-silver/70">{item.asset.name}</div>
+                                </div>
+                              </div>
+
+                              {/* Element Badge */}
+                              {item.asset.primaryElement && (
+                                <div className="mx-4">
+                                  <ElementIndicator element={item.asset.primaryElement} size="sm" />
+                                </div>
+                              )}
+
+                              {/* Score */}
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <div className={`text-2xl font-bold ${
+                                    item.compatibilityScore >= 7 ? 'text-green-400' :
+                                    item.compatibilityScore >= 4 ? 'text-yellow-400' :
+                                    'text-red-400'
+                                  }`}>
+                                    {item.compatibilityScore.toFixed(1)}
+                                  </div>
+                                  <div className="text-xs text-cosmic-silver/50">/ 10</div>
+                                </div>
+                                <div className="text-cosmic-violet group-hover:translate-x-1 transition-transform">
+                                  →
+                                </div>
+                              </div>
                             </div>
-                            <div className={`text-lg font-bold ${
-                              item.compatibilityScore >= 8 ? 'text-green-400' :
-                              item.compatibilityScore >= 6 ? 'text-yellow-400' :
-                              'text-orange-400'
-                            }`}>
-                              {item.compatibilityScore.toFixed(1)}
+
+                            {/* Progress Bar */}
+                            <div className="mt-3">
+                              <div className="h-1.5 bg-cosmic-deep/50 rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${(item.compatibilityScore / 10) * 100}%` }}
+                                  transition={{ delay: index * 0.1 + 0.3, duration: 0.6 }}
+                                  className={`h-full bg-gradient-to-r ${
+                                    item.compatibilityScore >= 7 ? 'from-green-500 to-green-600' :
+                                    item.compatibilityScore >= 4 ? 'from-yellow-500 to-yellow-600' :
+                                    'from-red-500 to-red-600'
+                                  }`}
+                                />
+                              </div>
                             </div>
                           </div>
-                          {item.asset.primaryElement && (
-                            <ElementIndicator element={item.asset.primaryElement} size="sm" />
-                          )}
-                          <div className="mt-3 text-xs text-cosmic-silver/70">
-                            Click to see full compatibility analysis
-                          </div>
-                        </div>
-                      </Link>
+                        </Link>
+                      </motion.div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-cosmic-silver/70">
-                    No compatibility data available yet
+                  <div className="text-center py-12">
+                    <div className="text-4xl mb-4">🔮</div>
+                    <div className="text-cosmic-silver/70 mb-4">
+                      No compatibility data available yet
+                    </div>
+                    <Link href="/compatibility">
+                      <Button variant="outline" size="sm">
+                        Calculate Compatibilities
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </CardContent>

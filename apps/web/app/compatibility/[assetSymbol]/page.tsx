@@ -9,7 +9,8 @@ import { useAuthStore } from '@/store/auth';
 import { apiClient } from '@/lib/api';
 import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
 import { ElementIndicator, ZodiacSign } from '@/components/astro';
-import type { CompatibilityResult, Asset } from '@/types';
+import { CompatibilityGauge, ElementHarmonyDiagram } from '@/components/compatibility';
+import type { CompatibilityResult, Asset, ChineseElement } from '@/types';
 
 export default function CompatibilityPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function CompatibilityPage() {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userElements, setUserElements] = useState<ChineseElement[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -45,6 +47,16 @@ export default function CompatibilityPage() {
 
       const foundAsset = assetResponse.results[0];
       setAsset(foundAsset);
+
+      // Fetch user birth chart for element data
+      try {
+        const birthChart = await apiClient.getUserBirthChart(user.id);
+        if (birthChart?.chinese?.favorableElements) {
+          setUserElements(birthChart.chinese.favorableElements);
+        }
+      } catch (chartError) {
+        console.error('Error fetching birth chart:', chartError);
+      }
 
       // Fetch compatibility
       const compatResult = await apiClient.getCompatibility(user.id, foundAsset.id);
@@ -148,7 +160,7 @@ export default function CompatibilityPage() {
           </p>
         </motion.div>
 
-        {/* Overall Score */}
+        {/* Overall Score with Gauge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -157,18 +169,16 @@ export default function CompatibilityPage() {
         >
           <Card variant="glass" padding="lg">
             <CardContent>
-              <div className="text-center">
-                <div className={`text-7xl font-bold mb-4 ${getScoreColor(compatibility.compatibilityScore)}`}>
-                  {compatibility.compatibilityScore.toFixed(1)}
-                  <span className="text-2xl text-cosmic-silver/50">/10</span>
-                </div>
-                <div className="text-xl text-cosmic-silver/80 mb-2">Overall Compatibility Score</div>
-                <div
-                  className={`text-lg font-semibold capitalize ${getRecommendationColor(
-                    compatibility.recommendationLevel
-                  )}`}
-                >
-                  {compatibility.recommendationLevel.replace('_', ' ')}
+              <div className="flex flex-col items-center py-8">
+                <CompatibilityGauge score={compatibility.compatibilityScore} size="lg" />
+                <div className="mt-6">
+                  <div
+                    className={`text-lg font-semibold capitalize ${getRecommendationColor(
+                      compatibility.recommendationLevel
+                    )}`}
+                  >
+                    {compatibility.recommendationLevel.replace('_', ' ')}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -329,8 +339,8 @@ export default function CompatibilityPage() {
           </motion.div>
         )}
 
-        {/* Element Harmony Details */}
-        {asset.primaryElement && (
+        {/* Element Harmony Diagram */}
+        {asset.primaryElement && userElements.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -339,28 +349,54 @@ export default function CompatibilityPage() {
           >
             <Card variant="glass" padding="lg">
               <CardHeader>
-                <CardTitle>Element Harmony</CardTitle>
+                <CardTitle>Element Harmony Analysis</CardTitle>
+                <CardDescription>
+                  Understanding the relationship between your favorable elements and {asset.symbol}'s elements
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center gap-8">
-                  <div className="text-center">
-                    <div className="text-sm text-cosmic-silver/70 mb-2">Your Element</div>
-                    {user.birthDate ? (
-                      <div className="text-lg font-medium">To be calculated</div>
-                    ) : (
-                      <div className="text-sm text-cosmic-silver/60">Add birth info</div>
-                    )}
-                  </div>
-                  <div className="text-3xl text-cosmic-violet">⇄</div>
-                  <div className="text-center">
-                    <div className="text-sm text-cosmic-silver/70 mb-2">{asset.symbol} Element</div>
-                    <ElementIndicator element={asset.primaryElement} size="md" />
-                  </div>
-                </div>
+                <ElementHarmonyDiagram
+                  userElements={userElements}
+                  assetElements={asset.primaryElement ? [asset.primaryElement, ...(asset.secondaryElement ? [asset.secondaryElement] : [])] : []}
+                  relationship={
+                    compatibility.elementCompatibilityScore >= 7 ? 'productive' :
+                    compatibility.elementCompatibilityScore >= 4 ? 'neutral' :
+                    'controlling'
+                  }
+                />
               </CardContent>
             </Card>
           </motion.div>
         )}
+
+        {/* Generate Prediction CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="mt-8"
+        >
+          <Card variant="glass" padding="lg" className="border-cosmic-violet/30">
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-cosmic-gold">
+                    Ready to Get a Detailed Prediction?
+                  </h3>
+                  <p className="text-sm text-cosmic-silver/70">
+                    Generate a timing prediction to find the best entry and exit points for {asset.symbol}
+                  </p>
+                </div>
+                <Link href={`/predictions/timing?asset=${asset.symbol}`}>
+                  <Button variant="primary" className="flex items-center gap-2">
+                    <TrendingUp size={18} />
+                    Generate Prediction
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Calculation Info */}
         <div className="mt-8 text-center text-sm text-cosmic-silver/50">
