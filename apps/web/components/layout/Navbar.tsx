@@ -92,22 +92,68 @@ export function Navbar() {
 
           {/* Credits and user menu */}
           <div className="flex items-center gap-4">
-            {/* Credits display */}
+            {/* Credits display with dropdown */}
             {user && (
-              <Link href="/settings">
+              <div className="relative group">
                 <motion.div
                   whileHover={{ scale: 1.05 }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-cosmic-gold/10 to-cosmic-violet/10 border border-cosmic-gold/30 cursor-pointer hover:border-cosmic-gold/50 transition-all"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-cosmic-gold/10 to-cosmic-violet/10 border cursor-pointer transition-all ${
+                    (user.creditsBalance || 0) < 5
+                      ? 'border-yellow-500/50 hover:border-yellow-500/70'
+                      : 'border-cosmic-gold/30 hover:border-cosmic-gold/50'
+                  }`}
                 >
                   <span className="text-cosmic-gold text-xl">💎</span>
                   <div className="flex flex-col items-end">
                     <span className="text-xs text-cosmic-silver/60">Credits</span>
-                    <span className="text-lg font-bold text-cosmic-gold">
+                    <span className={`text-lg font-bold ${
+                      (user.creditsBalance || 0) < 5 ? 'text-yellow-400' : 'text-cosmic-gold'
+                    }`}>
                       {user.creditsBalance || 0}
                     </span>
                   </div>
+                  {(user.creditsBalance || 0) < 5 && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                    </span>
+                  )}
                 </motion.div>
-              </Link>
+
+                {/* Dropdown */}
+                <div className="absolute right-0 mt-2 w-64 glass border border-cosmic-violet/30 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="p-4 border-b border-cosmic-violet/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-cosmic-silver/70">Current Balance</span>
+                      <span className="text-xl font-bold text-cosmic-gold">
+                        {user.creditsBalance || 0}
+                      </span>
+                    </div>
+                    {(user.creditsBalance || 0) < 5 && (
+                      <p className="text-xs text-yellow-400 flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span>Low credits! Purchase more to continue.</span>
+                      </p>
+                    )}
+                  </div>
+                  <Link href="/credits/purchase">
+                    <div className="px-4 py-3 hover:bg-cosmic-violet/20 transition-colors cursor-pointer border-b border-cosmic-violet/20">
+                      <span className="text-cosmic-silver/80 hover:text-cosmic-silver flex items-center gap-2">
+                        <span>💳</span>
+                        <span>Purchase Credits</span>
+                      </span>
+                    </div>
+                  </Link>
+                  <Link href="/credits/history">
+                    <div className="px-4 py-3 hover:bg-cosmic-violet/20 transition-colors cursor-pointer">
+                      <span className="text-cosmic-silver/80 hover:text-cosmic-silver flex items-center gap-2">
+                        <span>📜</span>
+                        <span>Transaction History</span>
+                      </span>
+                    </div>
+                  </Link>
+                </div>
+              </div>
             )}
 
             {/* User menu */}

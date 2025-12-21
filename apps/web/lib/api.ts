@@ -343,6 +343,32 @@ class APIClient {
     return response.data;
   }
 
+  async createPaymentIntent(
+    packageType: string,
+    blockchain: string,
+    token: string
+  ): Promise<any> {
+    const response = await this.client.post('/payments/crypto/intent', {
+      packageType,
+      blockchain,
+      token,
+    });
+    return response.data;
+  }
+
+  async getPaymentStatus(paymentId: string): Promise<Transaction> {
+    const response = await this.client.get<Transaction>(`/payments/transactions/${paymentId}`);
+    return response.data;
+  }
+
+  async verifyTransaction(paymentId: string, txHash: string): Promise<Transaction> {
+    const response = await this.client.post<Transaction>('/payments/crypto/verify', {
+      transactionId: paymentId,
+      transactionHash: txHash,
+    });
+    return response.data;
+  }
+
   // User profile
   async updateUserProfile(userId: string, data: Partial<User>): Promise<User> {
     const response = await this.client.patch<User>(`/users/${userId}`, data);

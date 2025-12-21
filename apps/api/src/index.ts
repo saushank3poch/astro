@@ -8,9 +8,11 @@ import authRoutes from './routes/auth.routes';
 import birthChartRoutes from './routes/birth-chart.routes';
 import predictionsRoutes from './routes/predictions.routes';
 import compatibilityRoutes from './routes/compatibility.routes';
+import paymentRoutes from './routes/payment.routes';
 import { requestLogger } from './middleware/request-logger.middleware';
 import { errorHandler, notFound } from './middleware/error.middleware';
 import logger from './utils/logger';
+import TransactionMonitor from './jobs/transaction-monitor.job';
 
 // Load environment variables
 dotenv.config();
@@ -79,6 +81,7 @@ app.use('/v1/auth', authRoutes);
 app.use('/v1', birthChartRoutes);
 app.use('/v1/predictions', predictionsRoutes);
 app.use('/v1/compatibility', compatibilityRoutes);
+app.use('/v1/payments', paymentRoutes);
 
 // 404 handler
 app.use(notFound);
@@ -97,6 +100,11 @@ app.listen(PORT, () => {
     nodeVersion: process.version,
   });
 
+  // Start transaction monitor
+  const transactionMonitor = new TransactionMonitor();
+  transactionMonitor.startMonitoringWithInterval();
+  logger.info('Transaction monitor started');
+
   console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
@@ -105,6 +113,7 @@ app.listen(PORT, () => {
 ║   Server running on: http://localhost:${PORT}        ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                        ║
 ║   Health check: http://localhost:${PORT}/health      ║
+║   Transaction Monitor: Active                        ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
   `);

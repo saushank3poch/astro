@@ -395,6 +395,7 @@ model Transaction {
   fromWallet        String? @map("from_wallet") @db.VarChar(255)
   toWallet          String? @map("to_wallet") @db.VarChar(255)
   blockchain        String? @db.VarChar(50)
+  tokenType         String? @map("token_type") @db.VarChar(20)
   confirmationCount Int?    @map("confirmation_count")
 
   // IAP Specific
@@ -430,6 +431,7 @@ model Transaction {
   @@index([createdAt(sort: Desc)])
   @@index([transactionHash])
   @@index([userId, createdAt(sort: Desc)])
+  @@index([blockchain, status])
   @@map("transactions")
 }
 
