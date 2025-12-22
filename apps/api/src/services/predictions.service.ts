@@ -21,6 +21,7 @@ import {
 } from '@astro/astro-core';
 import { AIAgentService, PredictionType } from './ai-agent.service';
 import CreditsService from './credits.service';
+import { PredictionCacheService } from './caching/prediction-cache.service';
 
 const prisma = new PrismaClient();
 
@@ -52,10 +53,12 @@ export interface GenerateDivinationRequest {
 export class PredictionsService {
   private aiService: AIAgentService;
   private creditsService: CreditsService;
+  private cacheService: PredictionCacheService;
 
   constructor() {
     this.aiService = new AIAgentService();
     this.creditsService = new CreditsService();
+    this.cacheService = new PredictionCacheService(1000); // Max 1000 cached entries
   }
 
   /**
@@ -63,6 +66,21 @@ export class PredictionsService {
    */
   async generateMacro(request: GenerateMacroRequest): Promise<any> {
     const { userId, year, assetClasses, method, enhanceWithAI } = request;
+
+    // Check cache first (for non-authenticated users or if specified)
+    const cacheKey = this.cacheService.generateKey('macro', { year, assetClasses, method });
+    const cached = await this.cacheService.get(cacheKey);
+
+    if (cached) {
+      console.log('📦 Returning cached macro prediction');
+      return {
+        predictionId: cached.predictionId,
+        result: cached.result,
+        aiEnhancement: cached.aiEnhancement,
+        creditsUsed: 0, // No credits used for cached results
+        fromCache: true,
+      };
+    }
 
     // Check credits if user is authenticated
     if (userId) {
@@ -99,6 +117,8 @@ export class PredictionsService {
         aiEnhancement = await this.aiService.enhancePrediction({
           predictionType: 'macro',
           rawPrediction: result,
+          predictionId: prediction.id,
+          userContext: { userId },
         });
       }
 
@@ -131,11 +151,21 @@ export class PredictionsService {
         );
       }
 
+      // Cache the result
+      const ttl = this.cacheService.getTTL('macro');
+      await this.cacheService.set(cacheKey, {
+        predictionId: updated.id,
+        result,
+        aiEnhancement,
+        creditsUsed: updated.creditsUsed,
+      }, ttl);
+
       return {
         predictionId: updated.id,
         result,
         aiEnhancement,
         creditsUsed: updated.creditsUsed,
+        fromCache: false,
       };
     } catch (error) {
       // Update prediction with error
@@ -156,6 +186,18 @@ export class PredictionsService {
    */
   async generateTiming(request: GenerateTimingRequest): Promise<any> {
     const { userId, assetId, targetDate, timeframe, enhanceWithAI } = request;
+
+    // Check cache first
+    const cacheKey = this.cacheService.generateKey('timing', { assetId, targetDate, timeframe });
+    const cached = await this.cacheService.get(cacheKey);
+
+    if (cached) {
+      console.log('📦 Returning cached timing prediction');
+      return {
+        ...cached,
+        fromCache: true,
+      };
+    }
 
     // Check credits
     if (userId) {
@@ -214,6 +256,8 @@ export class PredictionsService {
         aiEnhancement = await this.aiService.enhancePrediction({
           predictionType: 'timing',
           rawPrediction: result,
+          predictionId: prediction.id,
+          userContext: { userId },
         });
       }
 
@@ -252,11 +296,21 @@ export class PredictionsService {
         );
       }
 
+      // Cache the result
+      const ttl = this.cacheService.getTTL('timing');
+      await this.cacheService.set(cacheKey, {
+        predictionId: updated.id,
+        result,
+        aiEnhancement,
+        creditsUsed: updated.creditsUsed,
+      }, ttl);
+
       return {
         predictionId: updated.id,
         result,
         aiEnhancement,
         creditsUsed: updated.creditsUsed,
+        fromCache: false,
       };
     } catch (error) {
       await prisma.prediction.update({
@@ -329,6 +383,8 @@ export class PredictionsService {
         aiEnhancement = await this.aiService.enhancePrediction({
           predictionType: 'divination',
           rawPrediction: result,
+          predictionId: prediction.id,
+          userContext: { userId },
         });
       }
 
@@ -362,11 +418,13 @@ export class PredictionsService {
         );
       }
 
+      // Note: Divination is NOT cached (always unique)
       return {
         predictionId: updated.id,
         result,
         aiEnhancement,
         creditsUsed: updated.creditsUsed,
+        fromCache: false,
       };
     } catch (error) {
       await prisma.prediction.update({

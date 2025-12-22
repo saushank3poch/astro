@@ -3,6 +3,9 @@
  * Uses Claude or GPT-4 to enhance predictions with natural language
  */
 
+import { AICostTrackerService } from './monitoring/ai-cost-tracker.service';
+import { PromptVersionManager } from './prompt-version-manager.service';
+
 // Note: This service requires API keys to be configured
 // For now, we'll provide a mock implementation with structured prompts
 // In production, integrate with Anthropic's Claude API or OpenAI's GPT-4
@@ -12,6 +15,7 @@ export type PredictionType = 'macro' | 'timing' | 'divination';
 export interface AIEnhancementInput {
   predictionType: PredictionType;
   rawPrediction: any;
+  predictionId?: string;
   userContext?: {
     userId?: string;
     astrologicalProfile?: any;
@@ -27,40 +31,117 @@ export interface AIEnhancementOutput {
   riskWarnings: string[];
   educationalContext: string;
   confidence: number;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    estimatedCost: number;
+    latency: number;
+  };
 }
 
 export class AIAgentService {
   private apiKey: string | undefined;
   private model: 'claude' | 'gpt4' | 'mock';
+  private aiCostTracker: AICostTrackerService;
+  private promptVersionManager: PromptVersionManager;
 
   constructor() {
     // Check for API keys in environment
     this.apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY;
     this.model = process.env.ANTHROPIC_API_KEY ? 'claude' :
                  process.env.OPENAI_API_KEY ? 'gpt4' : 'mock';
+
+    this.aiCostTracker = new AICostTrackerService(1000); // $1000 monthly budget
+    this.promptVersionManager = new PromptVersionManager();
   }
 
   /**
    * Enhance prediction with AI-generated natural language
    */
   async enhancePrediction(input: AIEnhancementInput): Promise<AIEnhancementOutput> {
-    const prompt = this.buildPrompt(input);
+    const startTime = Date.now();
+
+    // Get active prompt version
+    const promptVersion = await this.promptVersionManager.getActivePrompt(input.predictionType);
+    const prompt = promptVersion?.systemPrompt || this.buildPrompt(input);
 
     if (this.model === 'mock') {
-      return this.mockEnhancement(input);
+      const result = this.mockEnhancement(input);
+      const latency = Date.now() - startTime;
+
+      // Track mock usage (estimated tokens)
+      if (input.predictionId) {
+        await this.trackUsage({
+          predictionId: input.predictionId,
+          predictionType: input.predictionType,
+          userId: input.userContext?.userId,
+          inputTokens: 500, // Estimated
+          outputTokens: 300, // Estimated
+          latency,
+        });
+      }
+
+      return result;
     }
 
     // In production, call actual AI API
     try {
+      let result: AIEnhancementOutput;
+
       if (this.model === 'claude') {
-        return await this.callClaude(prompt, input);
+        result = await this.callClaude(prompt, input);
       } else {
-        return await this.callGPT4(prompt, input);
+        result = await this.callGPT4(prompt, input);
       }
+
+      const latency = Date.now() - startTime;
+
+      // Track AI usage
+      if (input.predictionId && result.usage) {
+        await this.trackUsage({
+          predictionId: input.predictionId,
+          predictionType: input.predictionType,
+          userId: input.userContext?.userId,
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          latency,
+        });
+      }
+
+      return result;
     } catch (error) {
       console.error('AI enhancement failed, using fallback:', error);
       return this.mockEnhancement(input);
     }
+  }
+
+  /**
+   * Track AI usage for cost monitoring
+   */
+  private async trackUsage(data: {
+    predictionId: string;
+    predictionType: PredictionType;
+    userId?: string;
+    inputTokens: number;
+    outputTokens: number;
+    latency: number;
+  }): Promise<void> {
+    const modelName = this.model === 'claude'
+      ? 'claude-3-5-sonnet-20241022'
+      : this.model === 'gpt4'
+      ? 'gpt-4'
+      : 'mock';
+
+    await this.aiCostTracker.logUsage({
+      userId: data.userId,
+      predictionId: data.predictionId,
+      predictionType: data.predictionType,
+      model: modelName,
+      inputTokens: data.inputTokens,
+      outputTokens: data.outputTokens,
+      latency: data.latency,
+    });
   }
 
   /**

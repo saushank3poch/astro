@@ -66,6 +66,8 @@ model User {
   credits              UserCredits?
   usageLogs            UsageLog[]
   researchedAssets     Asset[]
+  aiUsageLogs          AIUsageLog[]
+  feedbacks            PredictionFeedback[]
 
   @@map("users")
 }
@@ -319,7 +321,9 @@ model Prediction {
   user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   asset Asset? @relation(fields: [targetAssetId], references: [id])
 
-  usageLogs UsageLog[]
+  usageLogs   UsageLog[]
+  aiUsageLogs AIUsageLog[]
+  feedbacks   PredictionFeedback[]
 
   @@index([userId])
   @@index([predictionType])
@@ -479,4 +483,80 @@ model UsageLog {
   @@index([createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("usage_logs")
+}
+
+// ============================================================================
+// MONITORING & ANALYTICS
+// ============================================================================
+
+model AIUsageLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  predictionId   String   @map("prediction_id") @db.Uuid
+  predictionType String   @map("prediction_type") @db.VarChar(50)
+  model          String   @db.VarChar(50)
+  inputTokens    Int      @map("input_tokens")
+  outputTokens   Int      @map("output_tokens")
+  totalTokens    Int      @map("total_tokens")
+  estimatedCost  Decimal  @map("estimated_cost") @db.Decimal(10, 6)
+  latency        Int      // milliseconds
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user       User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@index([predictionType])
+  @@map("ai_usage_logs")
+}
+
+model PredictionFeedback {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  predictionId String    @map("prediction_id") @db.Uuid
+  rating       Int       // 1-5 stars
+  helpful      Boolean
+  cameTrue     Boolean?  @map("came_true")
+  comment      String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, predictionId])
+  @@index([predictionId])
+  @@index([rating])
+  @@map("prediction_feedback")
+}
+
+model PromptVersion {
+  id               String   @id @default(uuid()) @db.Uuid
+  predictionType   String   @map("prediction_type") @db.VarChar(50)
+  version          String   @db.VarChar(20)
+  systemPrompt     String   @map("system_prompt") @db.Text
+  active           Boolean  @default(false)
+  performanceScore Decimal? @map("performance_score") @db.Decimal(3, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([predictionType, active])
+  @@map("prompt_versions")
+}
+
+model ErrorLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  errorType String   @map("error_type") @db.VarChar(100)
+  message   String   @db.Text
+  stack     String?  @db.Text
+  userId    String?  @map("user_id") @db.Uuid
+  endpoint  String?  @db.VarChar(255)
+  metadata  Json?
+  severity  String   @db.VarChar(20)
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([severity, resolved])
+  @@index([errorType])
+  @@map("error_logs")
 }

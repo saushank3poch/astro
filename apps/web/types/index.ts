@@ -16,6 +16,7 @@ export interface User {
   twitterHandle?: string;
   twitterUserId?: string;
   wallets?: WalletInfo[];
+  isAdmin?: boolean;
   createdAt: string;
 }
 

@@ -26,6 +26,20 @@ import type {
   PaginatedResponse,
   APIError,
 } from '@/types';
+import type {
+  OverviewStats,
+  AICostStats,
+  PerformanceStats,
+  ErrorLog,
+  ErrorStats,
+  ErrorFilters,
+  FeedbackStats,
+  FeedbackFilters,
+  PredictionFeedback,
+  FeedbackInput,
+  SlowRequest,
+  CacheStats,
+} from '@/types/admin';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
@@ -383,6 +397,83 @@ class APIClient {
   async createUserBirthChart(userId: string, data: any): Promise<any> {
     const response = await this.client.post(`/users/${userId}/birth-chart`, data);
     return response.data;
+  }
+
+  // Admin - Overview
+  async getAdminOverview(): Promise<OverviewStats> {
+    const response = await this.client.get<OverviewStats>('/admin/overview');
+    return response.data;
+  }
+
+  // Admin - AI Costs
+  async getAICosts(startDate: string, endDate: string, predictionType?: string, model?: string): Promise<AICostStats> {
+    const response = await this.client.get<AICostStats>('/admin/ai-costs', {
+      params: { startDate, endDate, predictionType, model },
+    });
+    return response.data;
+  }
+
+  // Admin - Performance
+  async getPerformanceStats(): Promise<PerformanceStats> {
+    const response = await this.client.get<PerformanceStats>('/admin/performance');
+    return response.data;
+  }
+
+  async getSlowRequests(limit?: number): Promise<SlowRequest[]> {
+    const response = await this.client.get<SlowRequest[]>('/admin/performance/slow-requests', {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async getCacheStats(): Promise<CacheStats> {
+    const response = await this.client.get<CacheStats>('/admin/performance/cache');
+    return response.data;
+  }
+
+  // Admin - Errors
+  async getErrors(filters: ErrorFilters): Promise<ErrorLog[]> {
+    const response = await this.client.get<ErrorLog[]>('/admin/errors', { params: filters });
+    return response.data;
+  }
+
+  async getErrorStats(): Promise<ErrorStats> {
+    const response = await this.client.get<ErrorStats>('/admin/errors/stats');
+    return response.data;
+  }
+
+  async markErrorResolved(errorId: string): Promise<void> {
+    await this.client.patch(`/admin/errors/${errorId}/resolve`);
+  }
+
+  // Admin - Feedback
+  async getFeedbackStats(filters?: FeedbackFilters): Promise<FeedbackStats> {
+    const response = await this.client.get<FeedbackStats>('/admin/feedback/stats', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async getAllFeedback(filters?: FeedbackFilters): Promise<PredictionFeedback[]> {
+    const response = await this.client.get<PredictionFeedback[]>('/admin/feedback', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  // User - Feedback
+  async submitFeedback(feedback: FeedbackInput): Promise<void> {
+    await this.client.post('/feedback', feedback);
+  }
+
+  async getFeedbackForPrediction(predictionId: string): Promise<PredictionFeedback | null> {
+    try {
+      const response = await this.client.get<PredictionFeedback>(`/feedback/prediction/${predictionId}`);
+      return response.data;
+    } catch (error) {
+      // Return null if no feedback found
+      return null;
+    }
   }
 }
 

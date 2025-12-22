@@ -9,13 +9,24 @@ import birthChartRoutes from './routes/birth-chart.routes';
 import predictionsRoutes from './routes/predictions.routes';
 import compatibilityRoutes from './routes/compatibility.routes';
 import paymentRoutes from './routes/payment.routes';
+import adminRoutes from './routes/admin.routes';
 import { requestLogger } from './middleware/request-logger.middleware';
 import { errorHandler, notFound } from './middleware/error.middleware';
+import {
+  initializeMonitoring,
+  performanceMonitoringMiddleware,
+  errorTrackingMiddleware,
+  healthCheckMiddleware,
+  startCleanupJob,
+} from './middleware/monitoring.middleware';
 import logger from './utils/logger';
 import TransactionMonitor from './jobs/transaction-monitor.job';
 
 // Load environment variables
 dotenv.config();
+
+// Initialize monitoring services
+const { performanceMonitor, errorTracker } = initializeMonitoring();
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
@@ -45,6 +56,12 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use(requestLogger);
+
+// Performance monitoring (track all requests)
+app.use(performanceMonitoringMiddleware);
+
+// Health check middleware
+app.use(healthCheckMiddleware);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -82,9 +99,13 @@ app.use('/v1', birthChartRoutes);
 app.use('/v1/predictions', predictionsRoutes);
 app.use('/v1/compatibility', compatibilityRoutes);
 app.use('/v1/payments', paymentRoutes);
+app.use('/v1/admin', adminRoutes);
 
 // 404 handler
 app.use(notFound);
+
+// Error tracking middleware (before error handler)
+app.use(errorTrackingMiddleware);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -105,15 +126,24 @@ app.listen(PORT, () => {
   transactionMonitor.startMonitoringWithInterval();
   logger.info('Transaction monitor started');
 
+  // Start monitoring cleanup job (runs every hour)
+  startCleanupJob(60);
+  logger.info('Monitoring cleanup job started');
+
   console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
 ║   🌟 Astro Prediction Platform API                   ║
 ║                                                       ║
-║   Server running on: http://localhost:${PORT}        ║
+║   Server: http://localhost:${PORT}                   ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                        ║
-║   Health check: http://localhost:${PORT}/health      ║
-║   Transaction Monitor: Active                        ║
+║   Health: http://localhost:${PORT}/health            ║
+║   Admin: http://localhost:${PORT}/v1/admin/overview  ║
+║                                                       ║
+║   ✅ Transaction Monitor: Active                     ║
+║   ✅ Performance Monitoring: Active                  ║
+║   ✅ Error Tracking: Active                          ║
+║   ✅ Cache: Active                                   ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
   `);
