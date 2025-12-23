@@ -10,6 +10,7 @@ import predictionsRoutes from './routes/predictions.routes';
 import compatibilityRoutes from './routes/compatibility.routes';
 import paymentRoutes from './routes/payment.routes';
 import adminRoutes from './routes/admin.routes';
+import mobileRoutes from './routes/mobile.routes';
 import { requestLogger } from './middleware/request-logger.middleware';
 import { errorHandler, notFound } from './middleware/error.middleware';
 import {
@@ -21,6 +22,7 @@ import {
 } from './middleware/monitoring.middleware';
 import logger from './utils/logger';
 import TransactionMonitor from './jobs/transaction-monitor.job';
+import NotificationScheduler from './jobs/notification-scheduler.job';
 
 // Load environment variables
 dotenv.config();
@@ -100,6 +102,7 @@ app.use('/v1/predictions', predictionsRoutes);
 app.use('/v1/compatibility', compatibilityRoutes);
 app.use('/v1/payments', paymentRoutes);
 app.use('/v1/admin', adminRoutes);
+app.use('/v1/mobile', mobileRoutes);
 
 // 404 handler
 app.use(notFound);
@@ -130,6 +133,11 @@ app.listen(PORT, () => {
   startCleanupJob(60);
   logger.info('Monitoring cleanup job started');
 
+  // Start notification scheduler (runs every hour)
+  const notificationScheduler = new NotificationScheduler();
+  notificationScheduler.startScheduler();
+  logger.info('Notification scheduler started');
+
   console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
@@ -144,6 +152,7 @@ app.listen(PORT, () => {
 ║   ✅ Performance Monitoring: Active                  ║
 ║   ✅ Error Tracking: Active                          ║
 ║   ✅ Cache: Active                                   ║
+║   ✅ Notification Scheduler: Active                  ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
   `);

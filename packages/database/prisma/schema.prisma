@@ -56,18 +56,21 @@ model User {
   notificationsEnabled  Boolean @default(true) @map("notifications_enabled")
 
   // Relations
-  oauthConnections     OAuthConnection[]
-  walletConnections    WalletConnection[]
-  astrologicalProfile  UserAstrologicalProfile?
-  predictions          Prediction[]
-  assetCompatibility   UserAssetCompatibility[]
-  linkingRequests      AccountLinkingRequest[]
-  transactions         Transaction[]
-  credits              UserCredits?
-  usageLogs            UsageLog[]
-  researchedAssets     Asset[]
-  aiUsageLogs          AIUsageLog[]
-  feedbacks            PredictionFeedback[]
+  oauthConnections       OAuthConnection[]
+  walletConnections      WalletConnection[]
+  astrologicalProfile    UserAstrologicalProfile?
+  predictions            Prediction[]
+  assetCompatibility     UserAssetCompatibility[]
+  linkingRequests        AccountLinkingRequest[]
+  transactions           Transaction[]
+  credits                UserCredits?
+  usageLogs              UsageLog[]
+  researchedAssets       Asset[]
+  aiUsageLogs            AIUsageLog[]
+  feedbacks              PredictionFeedback[]
+  deviceTokens           DeviceToken[]
+  mobileSubscription     MobileSubscription?
+  notificationPreference NotificationPreference?
 
   @@map("users")
 }
@@ -559,4 +562,60 @@ model ErrorLog {
   @@index([severity, resolved])
   @@index([errorType])
   @@map("error_logs")
+}
+
+// ============================================================================
+// MOBILE SUPPORT
+// ============================================================================
+
+model DeviceToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique @db.VarChar(255)
+  platform  String   @db.VarChar(20) // 'ios' or 'android'
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model MobileSubscription {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @unique @map("user_id") @db.Uuid
+  platform              String    @db.VarChar(20) // 'ios' or 'android'
+  tier                  String    @db.VarChar(20) // 'free', 'basic', 'pro'
+  productId             String?   @map("product_id") @db.VarChar(255)
+  transactionId         String?   @map("transaction_id") @db.VarChar(255)
+  originalTransactionId String?   @map("original_transaction_id") @db.VarChar(255)
+  expiresAt             DateTime? @map("expires_at")
+  autoRenewing          Boolean   @default(false) @map("auto_renewing")
+  inGracePeriod         Boolean   @default(false) @map("in_grace_period")
+  receiptData           String?   @map("receipt_data") @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("mobile_subscriptions")
+}
+
+model NotificationPreference {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  dailyInsight       Boolean  @default(true) @map("daily_insight")
+  favorablePeriods   Boolean  @default(true) @map("favorable_periods")
+  lowCredit          Boolean  @default(true) @map("low_credit")
+  subscriptionExpiry Boolean  @default(true) @map("subscription_expiry")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
 }
